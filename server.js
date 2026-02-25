@@ -1,35 +1,34 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
+const admin = require('firebase-admin');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-
-const DATA_DIR = process.env.DATA_DIR || __dirname;
-const DATA_FILE = path.join(DATA_DIR, 'ministering_comps.json');
-const MASTER_BROS_FILE = path.join(DATA_DIR, 'bros_new.json');
-const MASTER_FAMS_FILE = path.join(DATA_DIR, 'fams_new.json');
-
-// Ensure data directory exists
-if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-}
-
-// Helper to seed initial data files if they don't exist in the data directory
-const seedFile = (fileName) => {
-    const src = path.join(__dirname, fileName);
-    const dest = path.join(DATA_DIR, fileName);
-    if (!fs.existsSync(dest) && fs.existsSync(src)) {
-        fs.copyFileSync(src, dest);
-    }
-};
-
-seedFile('ministering_comps.json');
-seedFile('bros_new.json');
-seedFile('fams_new.json');
-
 const PIN = process.env.PIN || '1234';
+
+// Initialize Firebase Admin
+let db;
+try {
+    let serviceAccount;
+    // Check if we are passing credentials as an env variable (for production like Render)
+    if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+        serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    } else {
+        // Fallback to local file for development
+        serviceAccount = require('./firebase-key.json');
+    }
+
+    admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount)
+    });
+    db = admin.firestore();
+    console.log("Firebase initialized successfully.");
+} catch (error) {
+    console.error("Firebase initialization failed:", error);
+}
 
 app.use(cors());
 app.use(express.json());
@@ -49,15 +48,34 @@ app.get('/api/verify', (req, res) => {
     res.json({ success: true });
 });
 
-app.get('/api/data', (req, res) => {
+app.get('/api/data', async (req, res) => {
     try {
-        const compsData = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-        const brosData = JSON.parse(fs.readFileSync(MASTER_BROS_FILE, 'utf8'));
-        const famsData = JSON.parse(fs.readFileSync(MASTER_FAMS_FILE, 'utf8'));
+        const docRef = db.collection('ministering').doc('mainData');
+        const doc = await docRef.get();
+        
+        let data;
+        if (!doc.exists) {
+            console.log("No data found in Firestore, seeding from local files...");
+            const compsData = JSON.parse(fs.readFileSync(path.join(__dirname, 'ministering_comps.json'), 'utf8'));
+            const brosData = JSON.parse(fs.readFileSync(path.join(__dirname, 'bros_new.json'), 'utf8'));
+            const famsData = JSON.parse(fs.readFileSync(path.join(__dirname, 'fams_new.json'), 'utf8'));
+            
+            data = {
+                comps: compsData,
+                masterBros: brosData,
+                masterFams: famsData
+            };
+            
+            // Seed the database
+            await docRef.set(data);
+        } else {
+            data = doc.data();
+        }
+
         res.json({
-            comps: compsData,
-            masterBros: brosData,
-            masterFams: famsData
+            comps: data.comps || {},
+            masterBros: data.masterBros || [],
+            masterFams: data.masterFams || []
         });
     } catch (e) {
         console.error("GET /api/data error:", e);
@@ -65,19 +83,16 @@ app.get('/api/data', (req, res) => {
     }
 });
 
-app.post('/api/data', (req, res) => {
+app.post('/api/data', async (req, res) => {
     try {
         const newData = req.body;
-        // Backup just in case
-        fs.copyFileSync(DATA_FILE, DATA_FILE + '.bak');
+        const docRef = db.collection('ministering').doc('mainData');
         
         if (newData.comps) {
-            fs.writeFileSync(DATA_FILE, JSON.stringify(newData.comps, null, 2));
-            if (newData.masterBros) fs.writeFileSync(MASTER_BROS_FILE, JSON.stringify(newData.masterBros, null, 2));
-            if (newData.masterFams) fs.writeFileSync(MASTER_FAMS_FILE, JSON.stringify(newData.masterFams, null, 2));
+            await docRef.set(newData, { merge: true });
         } else {
-            // Fallback for old save format
-            fs.writeFileSync(DATA_FILE, JSON.stringify(newData, null, 2));
+            // Fallback for older formats
+            await docRef.set({ comps: newData }, { merge: true });
         }
         
         res.json({ success: true });

@@ -6,3 +6,5 @@ test_pdf2json.js
 parse_data.js
 *.bak
 .DS_Store
+firebase-key.json
+.env
