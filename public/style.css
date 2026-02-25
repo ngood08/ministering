@@ -1,0 +1,68 @@
+:root { --bg: #f4f5f7; --header: #2c3e50; --bro-bg: #e3f2fd; --bro-bd: #2196f3; --fam-bg: #e8f5e9; --fam-bd: #4caf50; --sel: #ffe082; }
+body { font-family: sans-serif; margin: 0; background: var(--bg); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+/* Header */
+header { background: var(--header); color: white; padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.2); z-index: 10; }
+h1 { font-size: 1.1rem; margin: 0; }
+.header-btns { display: flex; gap: 10px; }
+button.action-btn { background: #27ae60; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-size: 0.9rem; transition: background 0.3s; }
+button.action-btn:hover { background: #2ecc71; }
+button.action-btn.import { background: #e67e22; }
+button.action-btn.import:hover { background: #f39c12; }
+
+/* Layout */
+#container { display: flex; flex: 1; overflow: hidden; }
+
+/* Sidebars */
+.sidebar { width: 280px; background: white; border-right: 1px solid #ccc; display: flex; flex-direction: column; z-index: 5; }
+.sidebar.right { border-left: 1px solid #ccc; border-right: none; }
+
+.pool-header { padding: 10px; background: #ecf0f1; border-bottom: 1px solid #ddd; }
+.search-box { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; margin-top: 5px; }
+
+.pool-title { font-weight: bold; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center; }
+.add-item-btn { 
+    background: #27ae60; color: white; border: none; 
+    width: 24px; height: 24px; border-radius: 50%; 
+    cursor: pointer; font-weight: bold; font-size: 1.2rem; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+}
+.add-item-btn:hover { background: #2ecc71; }
+
+.pool-content { flex: 1; overflow-y: auto; padding: 5px; background: #f9f9f9; }
+
+/* Main Board */
+#board { flex: 1; background: #e5e5e5; display: flex; gap: 15px; padding: 15px; overflow-x: auto; }
+
+.district { min-width: 320px; width: 320px; background: #dfe6e9; border-radius: 8px; display: flex; flex-direction: column; max-height: 100%; border: 1px solid #b2bec3; }
+.dist-header { padding: 10px; background: #b2bec3; color: #2d3436; font-weight: bold; text-align: center; border-radius: 7px 7px 0 0; }
+.dist-body { padding: 10px; overflow-y: auto; flex: 1; }
+
+/* Companionship Card */
+.card { background: white; border-radius: 6px; padding: 10px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+.card-head { display: flex; justify-content: space-between; font-size: 0.8rem; color: #7f8c8d; margin-bottom: 5px; font-weight: bold; }
+.lbl { font-size: 0.7rem; color: #bdc3c7; text-transform: uppercase; margin-top: 8px; font-weight: bold; }
+
+/* Drop Boxes */
+.box { min-height: 40px; border: 1px solid transparent; background: rgba(0,0,0,0.03); border-radius: 4px; padding: 5px; transition: background 0.2s; }
+.box.highlight { background-color: #fff9c4; border: 2px dashed #fbc02d; }
+
+/* Draggable Items */
+.item { display: flex; justify-content: space-between; align-items: center; padding: 10px; margin: 4px 0; border-radius: 4px; font-size: 0.9rem; cursor: pointer; border-left: 5px solid #ccc; background: white; user-select: none; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+.item:active { transform: scale(0.98); }
+.item.bro { background: var(--bro-bg); border-left-color: var(--bro-bd); }
+.item.fam { background: var(--fam-bg); border-left-color: var(--fam-bd); }
+.item.selected { background: var(--sel) !important; border: 2px solid #f57f17; transform: scale(1.02); z-index: 100; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
+.item-del-btn { color: #e74c3c; font-weight: bold; font-size: 1.1rem; padding: 0 5px; opacity: 0.5; transition: opacity 0.2s; }
+.item-del-btn:hover { opacity: 1; color: #c0392b; }
+
+.add-btn { width: 100%; padding: 12px; background: white; border: 2px dashed #bdc3c7; color: #7f8c8d; cursor: pointer; margin-top: 10px; font-weight: bold; text-align: center; }
+
+/* Mobile */
+@media (max-width: 768px) {
+    #container { flex-direction: column; overflow-y: auto; }
+    .sidebar { width: 100%; max-height: 35vh; border-bottom: 4px solid #ccc; flex-shrink: 0; }
+    .sidebar.right { border-top: 4px solid #ccc; order: 3; }
+    #board { flex-direction: column; overflow: visible; padding: 10px; height: auto; }
+    .district { width: 100%; margin-bottom: 25px; }
+}

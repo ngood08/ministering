@@ -1,0 +1,8 @@
+node_modules/
+eq_raw.txt
+hh_raw.txt
+test_parse.js
+test_pdf2json.js
+parse_data.js
+*.bak
+.DS_Store

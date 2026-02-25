@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ministering Sandbox (Import/Export)</title>
+    <style>
+        :root { --bg: #f4f5f7; --header: #2c3e50; --bro-bg: #e3f2fd; --bro-bd: #2196f3; --fam-bg: #e8f5e9; --fam-bd: #4caf50; --sel: #ffe082; }
+        body { font-family: sans-serif; margin: 0; background: var(--bg); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        
+        /* Header */
+        header { background: var(--header); color: white; padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.2); z-index: 10; }
+        h1 { font-size: 1.1rem; margin: 0; }
+        .header-btns { display: flex; gap: 10px; }
+        button.action-btn { background: #27ae60; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-size: 0.9rem; }
+        button.action-btn.import { background: #e67e22; }
+        
+        /* Layout */
+        #container { display: flex; flex: 1; overflow: hidden; }
+        
+        /* Sidebars */
+        .sidebar { width: 280px; background: white; border-right: 1px solid #ccc; display: flex; flex-direction: column; z-index: 5; }
+        .sidebar.right { border-left: 1px solid #ccc; border-right: none; }
+        
+        .pool-header { padding: 10px; background: #ecf0f1; border-bottom: 1px solid #ddd; }
+        .search-box { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; margin-top: 5px; }
+        
+        .pool-title { font-weight: bold; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center; }
+        .add-item-btn { 
+            background: #27ae60; color: white; border: none; 
+            width: 24px; height: 24px; border-radius: 50%; 
+            cursor: pointer; font-weight: bold; font-size: 1.2rem; line-height: 1;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .add-item-btn:hover { background: #2ecc71; }
+        
+        .pool-content { flex: 1; overflow-y: auto; padding: 5px; background: #f9f9f9; }
+        
+        /* Main Board */
+        #board { flex: 1; background: #e5e5e5; display: flex; gap: 15px; padding: 15px; overflow-x: auto; }
+        
+        .district { min-width: 320px; width: 320px; background: #dfe6e9; border-radius: 8px; display: flex; flex-direction: column; max-height: 100%; border: 1px solid #b2bec3; }
+        .dist-header { padding: 10px; background: #b2bec3; color: #2d3436; font-weight: bold; text-align: center; border-radius: 7px 7px 0 0; }
+        .dist-body { padding: 10px; overflow-y: auto; flex: 1; }
+        
+        /* Companionship Card */
+        .card { background: white; border-radius: 6px; padding: 10px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .card-head { display: flex; justify-content: space-between; font-size: 0.8rem; color: #7f8c8d; margin-bottom: 5px; font-weight: bold; }
+        .lbl { font-size: 0.7rem; color: #bdc3c7; text-transform: uppercase; margin-top: 8px; font-weight: bold; }
+        
+        /* Drop Boxes */
+        .box { min-height: 40px; border: 1px solid transparent; background: rgba(0,0,0,0.03); border-radius: 4px; padding: 5px; transition: background 0.2s; }
+        .box.highlight { background-color: #fff9c4; border: 2px dashed #fbc02d; }
+        
+        /* Draggable Items */
+        .item { padding: 10px; margin: 4px 0; border-radius: 4px; font-size: 0.9rem; cursor: pointer; border-left: 5px solid #ccc; background: white; user-select: none; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .item:active { transform: scale(0.98); }
+        .item.bro { background: var(--bro-bg); border-left-color: var(--bro-bd); }
+        .item.fam { background: var(--fam-bg); border-left-color: var(--fam-bd); }
+        .item.selected { background: var(--sel) !important; border: 2px solid #f57f17; transform: scale(1.02); z-index: 100; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
+        
+        .add-btn { width: 100%; padding: 12px; background: white; border: 2px dashed #bdc3c7; color: #7f8c8d; cursor: pointer; margin-top: 10px; font-weight: bold; text-align: center; }
+
+        /* Mobile */
+        @media (max-width: 768px) {
+            #container { flex-direction: column; overflow-y: auto; }
+            .sidebar { width: 100%; max-height: 35vh; border-bottom: 4px solid #ccc; flex-shrink: 0; }
+            .sidebar.right { border-top: 4px solid #ccc; order: 3; }
+            #board { flex-direction: column; overflow: visible; padding: 10px; height: auto; }
+            .district { width: 100%; margin-bottom: 25px; }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Ministering Sandbox</h1>
+    <div class="header-btns">
+        <input type="file" id="import-file" style="display:none" onchange="handleFileSelect(this)">
+        <button class="action-btn import" onclick="document.getElementById('import-file').click()">Import JSON</button>
+        <button class="action-btn" onclick="downloadJSON()">Save JSON</button>
+    </div>
+</header>
+
+<div id="container">
+    <div class="sidebar">
+        <div class="pool-header">
+            <div class="pool-title">
+                Unassigned Brothers <span id="cnt-bros">0</span>
+                <button class="add-item-btn" onclick="manualAdd('bro')" title="Add Missing Brother">+</button>
+            </div>
+            <input type="text" id="search-bros" class="search-box" placeholder="Search brothers..." onkeyup="filterList('pool-bros', this.value)">
+        </div>
+        <div id="pool-bros" class="pool-content box" data-type="bro"></div>
+    </div>
+    
+    <div id="board">
+        </div>
+
+    <div class="sidebar right">
+        <div class="pool-header">
+            <div class="pool-title">
+                Unassigned Households <span id="cnt-fams">0</span>
+                <button class="add-item-btn" onclick="manualAdd('fam')" title="Add Missing Household">+</button>
+            </div>
+            <input type="text" id="search-fams" class="search-box" placeholder="Search households..." onkeyup="filterList('pool-fams', this.value)">
+        </div>
+        <div id="pool-fams" class="pool-content box" data-type="fam"></div>
+    </div>
+</div>
+
+<script>
+    // --- MASTER DATA ---
+    const MASTER_BROS = [
+    "Adams, Steven",
+    "Ahlstrom, James",
+    "Alvey, Jacob",
+    "Alvey, Ryan",
+    "Arnold, Spencer",
+    "Bancel, Eugene",
+    "Banks, Bryan",
+    "Bartunek, Kristopher",
+    "Benjamin, Jansen",
+    "Blanchard, Chris",
+    "Bleak, Kent",
+    "Bradbeer, Morris",
+    "Brendoff, Daniel Paul Michael",
+    "Call, Gavyn Merlin",
+    "Campbell, Thai",
+    "Carson, Lance",
+    "Casperson, Michael",
+    "Cawagdan, Jeremy Wayne",
+    "Christensen, Matt",
+    "Collins, Brian",
+    "Cook, Kyle",
+    "Cox, Logan Glen",
+    "Cox, Ryan Stephen",
+    "Dan, Cory",
+    "Dayhoff, Joshua",
+    "Deyette, Stacy",
+    "Douglas, Dylan",
+    "Duffy, Waylon",
+    "Eastman, Adam",
+    "Egbert, Dillan",
+    "Emro, Ronald",
+    "Fairchild, Arthur Earl",
+    "Fairchild, Darrin Allan",
+    "Ferrell, Zach",
+    "Fitzgerald, Tommy",
+    "Fondren, Eric",
+    "Fondren, Kaden",
+    "Frewing, Izaak",
+    "Froman, Seth",
+    "Gallagher, Garrett",
+    "Galloway, Rick",
+    "Garner, David",
+    "Garner, Mike",
+    "Geisler, Nathan",
+    "Good, Nathan",
+    "Goodale, Mark",
+    "Green, Andrew Joseph",
+    "Green, Jay Michael",
+    "Grover, Josh",
+    "Harreld, Jason",
+    "Harris, Christopher Michael",
+    "Hassard, Jake",
+    "Hattaway, David",
+    "Hattaway, Jeremiah",
+    "Hattaway, Reid",
+    "Hebdon, Eli",
+    "Heck, Justin Taylor",
+    "Henrie, Luke",
+    "Hogan, Matt",
+    "Hunt, Benjamin",
+    "Hunter, John",
+    "Janes, Ben",
+    "Janes, Daniel",
+    "Jensen, Lenn Jerry",
+    "Jeppson, Carson Jeffrey",
+    "Kennedy, Raymond",
+    "King, Bob",
+    "Klinginsmith, Logan",
+    "Kreftmeyer, James",
+    "Kunz, Paul",
+    "Larson, Shane",
+    "Law, Casey",
+    "Law, Jesse",
+    "Leslie, Nathan",
+    "Levanger, Jared",
+    "Levanger, Max",
+    "Lough, Jim",
+    "Lowe, Roger Dee",
+    "Mafi, Kuluni Folaukovi Kelvin",
+    "Mangum, Carl",
+    "Mann, Mike",
+    "Martinez Zarate, Tristan",
+    "Mattravers, Jared",
+    "Maughan, Kevin Haydon",
+    "Meine, Bob",
+    "Moore, Jaxon Isaiah",
+    "Moore, Robert Ryan",
+    "Moses, Aaron",
+    "Mothershead, Ryan",
+    "Munoz, Javier",
+    "Murri, Connor",
+    "Murri, Kent",
+    "Neal, James",
+    "Neal, Stan",
+    "Negrete, Abel Arturo",
+    "Nimmo, Brayden",
+    "Noel, Kevin",
+    "Olson, Bob",
+    "Pannell, Duke",
+    "Parsons, Kolton Charles",
+    "Pendleton, William Rulon",
+    "Pitcher, Lee",
+    "Pitts, John",
+    "Purcell, Lincoln",
+    "Quinata, Josh",
+    "Reid, Nick",
+    "Richardson, Stephen",
+    "Rodriguez, Daniel",
+    "Rogers, Mike",
+    "Rowan, Cole",
+    "Schmidt, Jason Christopher",
+    "Selee, Larry",
+    "Shafer, Jerry",
+    "Shaw, Brandon",
+    "Shaw, Preston",
+    "Siderman, Craig Oscar",
+    "Siderman, James Merton",
+    "Smith, Glen",
+    "Summers, Dylan Robert",
+    "Taylor, Brycen",
+    "Taylor, Chris",
+    "Teuscher, Garrett",
+    "Teuscher, Mark W",
+    "Thurgood, Doug",
+    "Tobler, James",
+    "Tome, Marcos Antonio",
+    "Van Gils, Gerard Edward Leopold",
+    "Van Loo, Joshua",
+    "Vause, Brett",
+    "Volkert, Roger Lee",
+    "Waford, Chip",
+    "Walker, Robin",
+    "Wall, Ryan",
+    "Webb, Wayne",
+    "Whiting, Austin",
+    "Williams, Gary Stanley",
+    "Williams, Jonathan Paul",
+    "Williams, TJ",
+    "Williams, Tyler",
+    "Witgenstein, Jordan",
+    "Womack, Joseph",
+    "Wright, Lucas",
+    "Yelton, Austin"
+];
+
+    const MASTER_FAMS = [
+    "Abegglen, Teanka",
+    "Adams, Steven & Heidi",
+    "Adams, Travis Joe & Ellen",
+    "Ahlstrom, James & Denise",
+    "Alvey, Ryan & Cori",
+    "Anderson, Austin & Madison Ryann",
+    "Anderson, Michelle",
+    "Arnold, Spencer & Charity",
+    "Bancel, Eugene",
+    "Banks, Tracey",
+    "Barrett, Desarrai",
+    "Bartunek, Kristopher",
+    "Bastian, Karen",
+    "Bayes, Ricky Ray Lee & Brooke",
+    "Bee, Heather",
+    "Benjamin, Jansen & Megan Elizabeth",
+    "Berry, Wendy",
+    "Blanchard, Chris & Kyly",
+    "Bleak, Kent & Nancy",
+    "Bradbeer, Morris & Stephanie",
+    "Bray, Toni",
+    "Brendoff, Daniel Paul Michael",
+    "Brown, Bethani",
+    "Call, Gavyn Merlin & Paige",
+    "Campbell, Kimberly",
+    "Cano, Cheri Diane",
+    "Carson, Lance",
+    "Cascio, Andrea",
+    "Casperson, Faye",
+    "Casperson, Michael",
+    "Cawagdan, Jeremy Wayne & Brittney",
+    "Christensen, Leah Marie",
+    "Christensen, Matt & Ladessa",
+    "Collins, Brian & Krista",
+    "Conde, Jenette",
+    "Cook, Kyle & Julie",
+    "Corona, Nancy Martinez",
+    "Cox, Logan Glen & Tiffany",
+    "Cox, Ryan Stephen & Aubrey",
+    "Dan, Cory & Savannah",
+    "Dayhoff, Joshua",
+    "Decker, Brian & Reesa",
+    "Deyette, Stacy & Suzanne",
+    "Douglas, Dylan",
+    "Drake, Mary",
+    "Duffy, Waylon & Sabrina",
+    "Eastman, Adam & Kymberli Ann",
+    "Egbert, Dillan & Brooklyn",
+    "Emro, Ronald & Linda",
+    "Fairchild, Arthur Earl",
+    "Fairchild, Darrin Allan",
+    "Fernandez, Ana",
+    "Fernandez, Jose Pedro & Shawna",
+    "Ferrell, Zach",
+    "Fitzgerald, Tommy",
+    "Fogle, MiKenna",
+    "Fondren, Eric & Kyndal",
+    "Fondren, Kaden",
+    "Frewing, Izaak & Abby",
+    "Froman, Seth",
+    "Frost, Kristina Marie",
+    "Gallagher, Garrett & Jaylyn",
+    "Gallegos, Daniel Frank & Susan Elizabeth",
+    "Galloway, Rick & Heather",
+    "Garner, David & Ayla Marie",
+    "Garner, Mike & Amanda",
+    "Geisler, Nathan & Sarena",
+    "Good, Nathan & Ariadna Briseida",
+    "Goodale, Mark & Cienna",
+    "Green, Andrew Joseph",
+    "Green, Jay Michael",
+    "Grover, Josh & Tnaya Loren",
+    "Harreld, Jason",
+    "Harris, Christopher Michael",
+    "Hassard, Jake & Katie",
+    "Hattaway, David & Bette Ann",
+    "Hattaway, Jeremiah",
+    "Hebdon, Eli & Christina",
+    "Heck, Justin Taylor & Cathy Lyn",
+    "Henderson, Bridget",
+    "Henrie, Luke",
+    "Hogan, Matt",
+    "Hope, Vicki",
+    "Huberty, Macy",
+    "Hunt, Megan",
+    "Hunter, John",
+    "Janes, Ben & Lisa Lynn",
+    "Janes, Daniel",
+    "Janes, Nona",
+    "Jensen, Lenn Jerry & Betty Lou",
+    "Jensen, Tauna Nicole",
+    "Jeppson, Carson Jeffrey & Kaitlyn Alysa",
+    "Jolley, Carol",
+    "Juarez, Alejandro Soto & Breonna Dell",
+    "Kennedy, Raymond & Janet",
+    "King, Bob",
+    "Kirkpatrick, Courtney",
+    "Kreftmeyer, James",
+    "Kunz, Paul & Amber",
+    "Lane, Teresa Lyn",
+    "Larson, Shane & Taylor",
+    "Law, Casey & Nancy",
+    "Law, Jesse & Kira Riann",
+    "Leslie, Nathan & Savannah Marie",
+    "Levanger, Jared & Jennifer",
+    "Levanger, Max",
+    "Limon, Kathy",
+    "Lonadier, Talena",
+    "Lough, Jim",
+    "Lowe, Roger Dee & Margaret",
+    "Mafi, Kuluni Folaukovi Kelvin & Maison Paige",
+    "Mangum, Carl & Unknown",
+    "Mann, Mike",
+    "Martinez Zarate, Tristan & Reagan",
+    "Mattravers, Jared & Jenny",
+    "Maughan, Kevin Haydon & Linzy McKell",
+    "McCowan, Katherine",
+    "Meine, Bob & Rosalie",
+    "Mirabal, Julianne Eve",
+    "Moore, Robert Ryan & Amanda Marie",
+    "Moses, Aaron & Marah Lyn",
+    "Mothershead, Ryan & Jessica",
+    "Munoz, Javier",
+    "Murri, Kent",
+    "Neal, Carolyn",
+    "Neal, James",
+    "Neal, Stan",
+    "Negrete, Abel Arturo",
+    "Negron, Paul & Lydia",
+    "Nelson, Michelle Janae",
+    "Nimmo, Brayden",
+    "Noel, Kevin & Cheryl",
+    "Olsen, Marissa",
+    "Olson, Bob & Betsy",
+    "Pannell, Duke & (Mrs.)",
+    "Parker, Robert & Ashley",
+    "Parsons, Kolton Charles & Danna",
+    "Pendleton, William Rulon",
+    "Peters, Vicki",
+    "Pitcher, Lee & Natalie",
+    "Pitchford, Whisper",
+    "Prince, Larry Wayne & Cheryl",
+    "Purcell, Lincoln & Emily",
+    "Purdy, Jeanette",
+    "Quinata, Josh & Allie",
+    "Reese, Carol",
+    "Regley, Kaylee",
+    "Reid, Nick & Brittney Jo",
+    "Richardson, Stephen & Annicka",
+    "Roberts, Zeke",
+    "Rodriguez, Daniel",
+    "Rogers, Mike & Ann",
+    "Rowan, Cole",
+    "Rydman, Catherine",
+    "Salyer, Nadine",
+    "Samuelson, Sarah Anne",
+    "Selee, Larry & Shellagh",
+    "Shafer, Jerry",
+    "Shaw, Brandon & Britt",
+    "Siderman, James Merton & Karen",
+    "Smart, Michelle",
+    "Smith, Elizabeth",
+    "Smith, Evelyn",
+    "Smith, Glen",
+    "Sotelo, Mercedes",
+    "Stokes, Jennifer Frances",
+    "Summers, Dylan Robert",
+    "Summers, Sandi",
+    "Taylor, Brycen & Savanna",
+    "Taylor, Chris & Lisa",
+    "Teuscher, Mark W",
+    "Thomson, Thompson & Kelsey",
+    "Thurgood, Doug & Camellia",
+    "Tobler, James",
+    "Tome, Marcos Antonio & McKenna Leona",
+    "Van Bergen, BRADFORD & Sarah Louise",
+    "Van Gils, Gerard Edward Leopold & Amanda Christina",
+    "Van Loo, Joshua & Saydi",
+    "Vause, Brett & Paula",
+    "Verheyen, Linda",
+    "Volkert, Roger Lee & Alice C",
+    "Waford, Chip & Paula Gayle",
+    "Walgamott, Cindy",
+    "Walker, Rachel",
+    "Walker, Robin",
+    "Wall, Ryan & Courteney",
+    "Webb, Wayne & Diane",
+    "Wells, Bekki",
+    "Whitaker, Mary-Lou",
+    "Whiting, Austin",
+    "Williams, Gary Stanley & Amanda",
+    "Williams, Jonathan Paul & Madison Susan",
+    "Williams, Tyler",
+    "Williams-Teal, Amanda",
+    "Wilson, Lajean",
+    "Witgenstein, Jordan",
+    "Womack, Joseph & Madison",
+    "Wright, Lucas",
+    "Zivkovic, Cynthia"
+];
+
+    let compId = 0;
+    let selItem = null;
+
+    // --- INIT ---
+    function init() {
+        // Clean Slate Init
+        renderFromData({});
+    }
+
+    // --- IMPORT / EXPORT ---
+    function handleFileSelect(input) {
+        const file = input.files[0];
+        if(!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const data = JSON.parse(e.target.result);
+                renderFromData(data);
+                input.value = ''; // Reset
+            } catch(err) {
+                alert("Invalid JSON file");
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    function renderFromData(data) {
+        // 1. Clear Board
+        const board = document.getElementById('board');
+        board.innerHTML = '';
+        
+        // 2. Identify Assignments
+        const assignedSet = new Set();
+        const distKeys = Object.keys(data).length > 0 ? Object.keys(data) : ["District 1 (Good)", "District 2 (Eastman)", "District 3 (Call)"];
+
+        // 3. Build Board
+        distKeys.forEach(name => {
+            const distCol = document.createElement('div');
+            distCol.className = 'district';
+            distCol.innerHTML = `
+                <div class="dist-header">${name}</div>
+                <div class="dist-body">
+                    <div class="add-btn" onclick="addComp(this.parentElement)">+ Add Comp</div>
+                </div>`;
+            
+            const body = distCol.querySelector('.dist-body');
+            const btn = body.querySelector('.add-btn');
+
+            if (data[name]) {
+                data[name].forEach(c => {
+                    if(c.brothers) c.brothers.forEach(n => assignedSet.add(n));
+                    if(c.families) c.families.forEach(n => assignedSet.add(n));
+                    const card = createCompUI(c.brothers, c.families);
+                    body.insertBefore(card, btn);
+                });
+            }
+            board.appendChild(distCol);
+        });
+
+        // 4. Build Pools (Master - Assigned)
+        const pBro = document.getElementById('pool-bros');
+        const pfam = document.getElementById('pool-fams');
+        pBro.innerHTML = '';
+        pfam.innerHTML = '';
+
+        const uniqueBros = [...new Set(MASTER_BROS)].sort();
+        const uniqueFams = [...new Set(MASTER_FAMS)].sort();
+
+        uniqueBros.forEach(n => {
+            if(!assignedSet.has(n)) pBro.appendChild(createItem(n, 'bro'));
+        });
+        
+        uniqueFams.forEach(n => {
+            if(!assignedSet.has(n)) pfam.appendChild(createItem(n, 'fam'));
+        });
+
+        // 5. Wire Events
+        const pools = [pBro, pfam];
+        pools.forEach(el => {
+            el.ondragover = e => e.preventDefault();
+            el.ondrop = e => { e.preventDefault(); drop(el); };
+            el.onclick = () => attemptMoveToBox(el);
+        });
+
+        updateCounts();
+    }
+
+    function downloadJSON() {
+        const data = {};
+        document.querySelectorAll('.district').forEach(d => {
+            const name = d.querySelector('.dist-header').innerText;
+            data[name] = [];
+            d.querySelectorAll('.card').forEach(c => {
+                const b = Array.from(c.querySelectorAll('.b-box .item')).map(i=>i.dataset.name);
+                const f = Array.from(c.querySelectorAll('.f-box .item')).map(i=>i.dataset.name);
+                if(b.length || f.length) data[name].push({brothers:b, families:f});
+            });
+        });
+        const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'ministering.json';
+        a.click();
+    }
+
+    // --- MANUAL ADD ---
+    function manualAdd(type) {
+        const name = prompt(type === 'bro' ? "Enter Brother's Name:" : "Enter Household Name:");
+        if(!name) return;
+        
+        const poolId = type === 'bro' ? 'pool-bros' : 'pool-fams';
+        const pool = document.getElementById(poolId);
+        const searchId = type === 'bro' ? 'search-bros' : 'search-fams';
+        
+        // Create and Prepend
+        const newItem = createItem(name, type);
+        pool.insertBefore(newItem, pool.firstChild);
+        
+        // Clear search
+        document.getElementById(searchId).value = '';
+        filterList(poolId, '');
+        
+        updateCounts();
+    }
+
+    // --- SEARCH FILTER ---
+    function filterList(poolId, text) {
+        const term = text.toLowerCase();
+        const items = document.querySelectorAll(`#${poolId} .item`);
+        items.forEach(item => {
+            const name = item.innerText.toLowerCase();
+            item.style.display = name.includes(term) ? 'block' : 'none';
+        });
+    }
+
+    // --- CORE LOGIC ---
+    function createItem(name, type) {
+        const d = document.createElement('div');
+        d.className = `item ${type}`;
+        d.textContent = name;
+        d.dataset.name = name;
+        d.dataset.type = type;
+        d.draggable = true;
+        
+        d.ondragstart = (e) => { e.dataTransfer.setData('text', ''); selItem = e.target; };
+        
+        d.onclick = (e) => {
+            e.stopPropagation();
+            if (selItem && selItem !== d) {
+                const parentBox = d.parentElement;
+                if (parentBox.classList.contains('box')) {
+                    attemptMoveToBox(parentBox);
+                    return;
+                }
+            }
+            if(selItem === d) deselect();
+            else select(d);
+        };
+        return d;
+    }
+
+    function createCompUI(bros = [], fams = []) {
+        compId++;
+        const id = `c-${compId}`;
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.id = id;
+        
+        card.innerHTML = `
+            <div class="card-head">Comp #${compId} <span style="color:red;cursor:pointer" onclick="delComp('${id}')">×</span></div>
+            <div class="lbl">Brothers</div>
+            <div class="box b-box" data-type="bro"></div>
+            <div class="lbl">Families</div>
+            <div class="box f-box" data-type="fam"></div>
+        `;
+
+        const bBox = card.querySelector('.b-box');
+        const fBox = card.querySelector('.f-box');
+        
+        bros.forEach(n => bBox.appendChild(createItem(n, 'bro')));
+        fams.forEach(n => fBox.appendChild(createItem(n, 'fam')));
+
+        [bBox, fBox].forEach(b => {
+            b.ondragover = e => e.preventDefault();
+            b.ondrop = e => { e.preventDefault(); drop(b); };
+            b.onclick = () => attemptMoveToBox(b);
+        });
+
+        return card;
+    }
+
+    function addComp(container) {
+        const comp = createCompUI();
+        const btn = container.querySelector('.add-btn');
+        container.insertBefore(comp, btn);
+    }
+
+    function delComp(id) {
+        if(!confirm('Delete this companionship?')) return;
+        const c = document.getElementById(id);
+        const pBro = document.getElementById('pool-bros');
+        const pFam = document.getElementById('pool-fams');
+        
+        Array.from(c.querySelectorAll('.item.bro')).forEach(i => pBro.insertBefore(i, pBro.firstChild));
+        Array.from(c.querySelectorAll('.item.fam')).forEach(i => pFam.insertBefore(i, pFam.firstChild));
+        c.remove();
+        updateCounts();
+    }
+
+    function select(el) {
+        if(selItem) selItem.classList.remove('selected');
+        selItem = el;
+        el.classList.add('selected');
+        const t = el.dataset.type;
+        document.querySelectorAll('.box').forEach(b => {
+            if(b.dataset.type === t) b.classList.add('highlight');
+            else b.classList.remove('highlight');
+        });
+    }
+
+    function deselect() {
+        if(selItem) selItem.classList.remove('selected');
+        selItem = null;
+        document.querySelectorAll('.box').forEach(b => b.classList.remove('highlight'));
+    }
+
+    function attemptMoveToBox(box) {
+        if(!selItem) return;
+        const itemType = selItem.dataset.type;
+        const boxType = box.dataset.type;
+        
+        if(itemType === boxType) {
+            box.appendChild(selItem);
+            selItem.style.display = 'block';
+            deselect();
+            updateCounts();
+        }
+    }
+
+    function drop(box) { attemptMoveToBox(box); }
+
+    function updateCounts() {
+        document.getElementById('cnt-bros').innerText = document.getElementById('pool-bros').children.length;
+        document.getElementById('cnt-fams').innerText = document.getElementById('pool-fams').children.length;
+    }
+
+    init();
+</script>
+
+</body>
+</html>

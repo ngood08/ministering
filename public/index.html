@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ministering Sandbox (Hosted)</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="login-overlay" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:9999;display:flex;justify-content:center;align-items:center;">
+    <div style="background:white;padding:30px;border-radius:8px;text-align:center;">
+        <h2 style="margin-top:0;">Enter PIN</h2>
+        <input type="password" id="pin-input" maxlength="4" style="font-size:32px;width:120px;text-align:center;letter-spacing:15px;padding:10px;border:2px solid #ccc;border-radius:4px;" onkeypress="if(event.key==='Enter') checkPin()">
+        <br><br>
+        <button class="action-btn" onclick="checkPin()" style="width:100%;font-size:1.1rem;">Login</button>
+        <div id="login-error" style="color:#e74c3c;margin-top:15px;display:none;font-weight:bold;">Incorrect PIN</div>
+    </div>
+</div>
+
+<header>
+    <h1>Ministering Sandbox</h1>
+    <div class="header-btns">
+        <input type="file" id="import-file" style="display:none" onchange="handleFileSelect(this)">
+        <button class="action-btn" onclick="document.getElementById('import-file').click()">Import JSON</button>
+        <button class="action-btn" onclick="downloadJSON()">Export JSON</button>
+        <button id="save-btn" class="action-btn import" onclick="saveToServer()">Save Changes</button>
+    </div>
+</header>
+
+<div id="container">
+    <div class="sidebar">
+        <div class="pool-header">
+            <div class="pool-title">
+                Unassigned Brothers <span id="cnt-bros">0</span>
+                <button class="add-item-btn" onclick="manualAdd('bro')" title="Add Missing Brother">+</button>
+            </div>
+            <input type="text" id="search-bros" class="search-box" placeholder="Search brothers..." onkeyup="filterList('pool-bros', this.value)">
+        </div>
+        <div id="pool-bros" class="pool-content box" data-type="bro"></div>
+    </div>
+    
+    <div id="board">
+        </div>
+
+    <div class="sidebar right">
+        <div class="pool-header">
+            <div class="pool-title">
+                Unassigned Households <span id="cnt-fams">0</span>
+                <button class="add-item-btn" onclick="manualAdd('fam')" title="Add Missing Household">+</button>
+            </div>
+            <input type="text" id="search-fams" class="search-box" placeholder="Search households..." onkeyup="filterList('pool-fams', this.value)">
+        </div>
+        <div id="pool-fams" class="pool-content box" data-type="fam"></div>
+    </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
