@@ -5,9 +5,29 @@ const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const DATA_FILE = path.join(__dirname, 'ministering_comps.json');
-const MASTER_BROS_FILE = path.join(__dirname, 'bros_new.json');
-const MASTER_FAMS_FILE = path.join(__dirname, 'fams_new.json');
+
+const DATA_DIR = process.env.DATA_DIR || __dirname;
+const DATA_FILE = path.join(DATA_DIR, 'ministering_comps.json');
+const MASTER_BROS_FILE = path.join(DATA_DIR, 'bros_new.json');
+const MASTER_FAMS_FILE = path.join(DATA_DIR, 'fams_new.json');
+
+// Ensure data directory exists
+if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+
+// Helper to seed initial data files if they don't exist in the data directory
+const seedFile = (fileName) => {
+    const src = path.join(__dirname, fileName);
+    const dest = path.join(DATA_DIR, fileName);
+    if (!fs.existsSync(dest) && fs.existsSync(src)) {
+        fs.copyFileSync(src, dest);
+    }
+};
+
+seedFile('ministering_comps.json');
+seedFile('bros_new.json');
+seedFile('fams_new.json');
 
 const PIN = process.env.PIN || '1234';
 
