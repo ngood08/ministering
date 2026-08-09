@@ -104,6 +104,9 @@ function renderFromData(data) {
     
     const assignedSet = new Set();
     const distKeys = Object.keys(data).length > 0 ? Object.keys(data) : ["District 1 (Good)", "District 2 (Eastman)", "District 3 (Call)"];
+    
+    // Sort districts numerically and alphabetically (e.g. District 1, District 2, District 3)
+    distKeys.sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
 
     distKeys.forEach(name => {
         const distCol = document.createElement('div');
