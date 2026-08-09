@@ -1,12 +1,12 @@
 // ==UserScript==
 // @name         LCR Ministering Sync Tool
 // @namespace    http://tampermonkey.net/
-// @version      1.2
+// @version      1.3
 // @description  Syncs ministering assignments and districts from LCR to local Ministering tool.
 // @author       You
 // @match        https://lcr.churchofjesuschrist.org/ministering*
 // @grant        GM_xmlhttpRequest
-// @connect      localhost
+// @connect      *
 // ==/UserScript==
 
 (function() {
