@@ -117,12 +117,21 @@ function renderFromData(data) {
         const body = distCol.querySelector('.dist-body');
         const btn = body.querySelector('.add-btn');
 
-        // Drag & Drop whole cards (companionships) into this district column
-        body.ondragover = e => e.preventDefault();
+        // Drag & Drop whole cards (companionships) into this district column with live preview and custom ordering
+        body.ondragover = e => {
+            e.preventDefault();
+            if (selCard) {
+                const afterElement = getDragAfterElement(body, e.clientY);
+                if (afterElement == null) {
+                    body.insertBefore(selCard, btn);
+                } else {
+                    body.insertBefore(selCard, afterElement);
+                }
+            }
+        };
         body.ondrop = e => {
             e.preventDefault();
             if (selCard) {
-                body.insertBefore(selCard, btn);
                 renumberComps();
                 saveToServer(true);
             }
@@ -377,6 +386,20 @@ function renumberComps() {
             count++;
         }
     });
+}
+
+function getDragAfterElement(container, y) {
+    const draggableElements = [...container.querySelectorAll('.card:not(.dragging-card)')];
+    
+    return draggableElements.reduce((closest, child) => {
+        const box = child.getBoundingClientRect();
+        const offset = y - box.top - box.height / 2;
+        if (offset < 0 && offset > closest.offset) {
+            return { offset: offset, element: child };
+        } else {
+            return closest;
+        }
+    }, { offset: Number.NEGATIVE_INFINITY }).element;
 }
 
 function attemptMoveToBox(box) {
