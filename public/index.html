@@ -22,6 +22,7 @@
     <h1>Ministering Sandbox</h1>
     <div class="header-btns">
         <input type="file" id="import-file" style="display:none" onchange="handleFileSelect(this)">
+        <button class="action-btn" onclick="window.open('/lcr-sync.user.js', '_blank')" style="background-color:#9b59b6;">Install LCR Sync Script</button>
         <button class="action-btn" onclick="document.getElementById('import-file').click()">Import JSON</button>
         <button class="action-btn" onclick="downloadJSON()">Export JSON</button>
         <button id="save-btn" class="action-btn import" onclick="saveToServer()">Save Changes</button>
