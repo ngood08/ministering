@@ -3,6 +3,7 @@ let MASTER_FAMS = [];
 
 let compId = 0;
 let selItem = null;
+let selCard = null;
 let currentPin = localStorage.getItem('ministering_pin') || '';
 
 async function checkPin() {
@@ -116,6 +117,17 @@ function renderFromData(data) {
         const body = distCol.querySelector('.dist-body');
         const btn = body.querySelector('.add-btn');
 
+        // Drag & Drop whole cards (companionships) into this district column
+        body.ondragover = e => e.preventDefault();
+        body.ondrop = e => {
+            e.preventDefault();
+            if (selCard) {
+                body.insertBefore(selCard, btn);
+                renumberComps();
+                saveToServer(true);
+            }
+        };
+
         if (data[name]) {
             data[name].forEach(c => {
                 if(c.brothers) c.brothers.forEach(n => assignedSet.add(n));
@@ -151,6 +163,7 @@ function renderFromData(data) {
     });
 
     updateCounts();
+    renumberComps();
 }
 
 function downloadJSON() {
@@ -228,7 +241,11 @@ function createItem(name, type) {
     d.dataset.type = type;
     d.draggable = true;
     
-    d.ondragstart = (e) => { e.dataTransfer.setData('text', ''); selItem = e.target; };
+    d.ondragstart = (e) => { 
+        e.stopPropagation(); // Prevent card dragging when dragging individual items
+        e.dataTransfer.setData('text', ''); 
+        selItem = e.target; 
+    };
     
     d.onclick = (e) => {
         e.stopPropagation();
@@ -269,7 +286,10 @@ function createCompUI(bros = [], fams = []) {
     card.id = id;
     
     card.innerHTML = `
-        <div class="card-head">Comp #${compId} <span style="color:red;cursor:pointer" onclick="delComp('${id}')">×</span></div>
+        <div class="card-head">
+            <span class="comp-number">Comp #${compId}</span>
+            <span style="color:red;cursor:pointer;float:right" onclick="delComp('${id}')">×</span>
+        </div>
         <div class="lbl">Brothers</div>
         <div class="box b-box" data-type="bro"></div>
         <div class="lbl">Families</div>
@@ -288,6 +308,24 @@ function createCompUI(bros = [], fams = []) {
         b.onclick = () => attemptMoveToBox(b);
     });
 
+    // Make the companionship card draggable
+    card.draggable = true;
+    
+    card.ondragstart = (e) => {
+        // If drag started by child item (brother/family), do NOT drag the whole card
+        if (e.target.classList.contains('item')) {
+            return;
+        }
+        e.dataTransfer.setData('text', '');
+        selCard = card;
+        card.classList.add('dragging-card');
+    };
+    
+    card.ondragend = () => {
+        card.classList.remove('dragging-card');
+        selCard = null;
+    };
+
     return card;
 }
 
@@ -295,6 +333,7 @@ function addComp(container) {
     const comp = createCompUI();
     const btn = container.querySelector('.add-btn');
     container.insertBefore(comp, btn);
+    renumberComps();
     saveToServer(true);
 }
 
@@ -308,6 +347,7 @@ function delComp(id) {
     Array.from(c.querySelectorAll('.item.fam')).forEach(i => pFam.insertBefore(i, pFam.firstChild));
     c.remove();
     updateCounts();
+    renumberComps();
     saveToServer(true);
 }
 
@@ -326,6 +366,17 @@ function deselect() {
     if(selItem) selItem.classList.remove('selected');
     selItem = null;
     document.querySelectorAll('.box').forEach(b => b.classList.remove('highlight'));
+}
+
+function renumberComps() {
+    let count = 1;
+    document.querySelectorAll('.card').forEach(card => {
+        const numSpan = card.querySelector('.comp-number');
+        if (numSpan) {
+            numSpan.textContent = `Comp #${count}`;
+            count++;
+        }
+    });
 }
 
 function attemptMoveToBox(box) {
