@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         LCR Ministering Sync Tool
 // @namespace    http://tampermonkey.net/
-// @version      1.3
+// @version      1.4
 // @description  Syncs ministering assignments and districts from LCR to local Ministering tool.
 // @author       You
 // @match        https://lcr.churchofjesuschrist.org/ministering*
@@ -45,7 +45,7 @@
     document.body.appendChild(container);
 
     document.getElementById('sync-now-btn').addEventListener('click', async () => {
-        const serverUrl = document.getElementById('sync-server-url').value.trim();
+        let serverUrl = document.getElementById('sync-server-url').value.trim();
         const pin = document.getElementById('sync-pin').value.trim();
         const statusEl = document.getElementById('sync-status');
 
@@ -53,6 +53,11 @@
             statusEl.textContent = 'Error: PIN is required!';
             statusEl.style.color = '#e74c3c';
             return;
+        }
+
+        // Remove trailing slash if present to avoid double-slash 404 errors
+        if (serverUrl.endsWith('/')) {
+            serverUrl = serverUrl.slice(0, -1);
         }
 
         // Save preferences
