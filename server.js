@@ -127,6 +127,142 @@ function findMatchingFamily(lcrName, existingFams) {
     return null;
 }
 
+// Pure synchronization function that maps companionships and handles adding/pruning of brothers and families
+function syncMinisteringData(currentData, reqBody) {
+    const data = currentData || {};
+    let elders = reqBody.elders;
+    let ministeringData = reqBody.ministeringData;
+    let debugKeys = null;
+
+    if (ministeringData) {
+        debugKeys = Object.keys(ministeringData);
+        if (!elders && ministeringData.elders) {
+            elders = ministeringData.elders;
+        }
+    }
+
+    if (!elders || !Array.isArray(elders)) {
+        throw new Error('Missing or invalid "elders" array');
+    }
+
+    const existingBros = new Set(data.masterBros || []);
+    const existingFams = new Set(data.masterFams || []);
+
+    const activeBros = new Set();
+    const activeFams = new Set();
+    let pruneBros = false;
+    let pruneFams = false;
+
+    // 1. Process eligible ministers and assignments
+    if (ministeringData && ministeringData.eligibleMinistersAndAssignments) {
+        const ema = ministeringData.eligibleMinistersAndAssignments;
+        
+        if (ema.eligibleMinisters && Array.isArray(ema.eligibleMinisters)) {
+            if (ema.eligibleMinisters.length > 0) {
+                pruneBros = true;
+                for (const min of ema.eligibleMinisters) {
+                    const lcrName = min.name;
+                    if (!lcrName) continue;
+                    
+                    let matchedName = findMatchingBrother(lcrName, existingBros);
+                    if (!matchedName) {
+                        existingBros.add(lcrName);
+                        activeBros.add(lcrName);
+                    } else {
+                        activeBros.add(matchedName);
+                    }
+                }
+            }
+        }
+        
+        if (ema.eligibleAssignments && Array.isArray(ema.eligibleAssignments)) {
+            if (ema.eligibleAssignments.length > 0) {
+                pruneFams = true;
+                for (const ass of ema.eligibleAssignments) {
+                    const lcrName = ass.name;
+                    if (!lcrName) continue;
+                    
+                    let matchedName = findMatchingFamily(lcrName, existingFams);
+                    if (!matchedName) {
+                        existingFams.add(lcrName);
+                        activeFams.add(lcrName);
+                    } else {
+                        activeFams.add(matchedName);
+                    }
+                }
+            }
+        }
+    }
+
+    // 2. Map companionships and match names to existing rosters
+    const newComps = {};
+    
+    for (const dist of elders) {
+        const distName = dist.districtName || "Unnamed District";
+        newComps[distName] = [];
+        
+        for (const comp of (dist.companionships || [])) {
+            const brothers = [];
+            const families = [];
+            
+            for (const min of (comp.ministers || [])) {
+                const lcrName = min.name;
+                if (!lcrName) continue;
+                
+                let matchedName = findMatchingBrother(lcrName, existingBros);
+                if (!matchedName) {
+                    matchedName = lcrName;
+                    existingBros.add(lcrName);
+                }
+                activeBros.add(matchedName);
+                brothers.push(matchedName);
+            }
+            
+            for (const ass of (comp.assignments || [])) {
+                const lcrName = ass.name;
+                if (!lcrName) continue;
+                
+                let matchedName = findMatchingFamily(lcrName, existingFams);
+                if (!matchedName) {
+                    matchedName = lcrName;
+                    existingFams.add(lcrName);
+                }
+                activeFams.add(matchedName);
+                families.push(matchedName);
+            }
+            
+            if (brothers.length > 0 || families.length > 0) {
+                newComps[distName].push({ brothers, families });
+            }
+        }
+    }
+
+    // Determine final master rosters (apply pruning only if we had valid non-empty input lists)
+    const finalBros = pruneBros ? Array.from(activeBros) : Array.from(existingBros);
+    const finalFams = pruneFams ? Array.from(activeFams) : Array.from(existingFams);
+
+    // Compute changes for logging and reporting
+    const addedBros = finalBros.filter(b => !(data.masterBros || []).includes(b));
+    const removedBros = (data.masterBros || []).filter(b => !finalBros.includes(b));
+    const addedFams = finalFams.filter(f => !(data.masterFams || []).includes(f));
+    const removedFams = (data.masterFams || []).filter(f => !finalFams.includes(f));
+
+    const finalData = {
+        comps: newComps,
+        masterBros: finalBros.sort(),
+        masterFams: finalFams.sort()
+    };
+
+    const report = {
+        addedBros,
+        removedBros,
+        addedFams,
+        removedFams
+    };
+
+    return { finalData, debugKeys, report };
+}
+
 app.get('/api/verify', (req, res) => {
     res.json({ success: true });
 });
@@ -187,40 +323,9 @@ app.post('/api/data', async (req, res) => {
 
 app.post('/api/sync', async (req, res) => {
     try {
-        let elders = req.body.elders;
-        let ministeringData = req.body.ministeringData;
-        let debugKeys = null;
+        // Save the incoming request body to a local file for diagnosis/debugging
+        fs.writeFileSync(path.join(__dirname, 'last_sync_payload.json'), JSON.stringify(req.body, null, 2), 'utf8');
 
-        if (ministeringData) {
-            debugKeys = Object.keys(ministeringData);
-            console.log("\n--- LCR SYNC DATA RECEIVED ---");
-            console.log("Keys inside ministeringData:", debugKeys);
-            
-            // Print details of each key to see what unassigned keys exist!
-            for (const key of debugKeys) {
-                const value = ministeringData[key];
-                if (Array.isArray(value)) {
-                    console.log(`- ${key}: Array (length: ${value.length})`);
-                    if (value.length > 0) {
-                        console.log(`  Sample item keys for ${key}:`, Object.keys(value[0]));
-                    }
-                } else if (value && typeof value === 'object') {
-                    console.log(`- ${key}: Object (keys: ${Object.keys(value)})`);
-                } else {
-                    console.log(`- ${key}: ${typeof value}`);
-                }
-            }
-            console.log("-------------------------------\n");
-
-            if (!elders && ministeringData.elders) {
-                elders = ministeringData.elders;
-            }
-        }
-
-        if (!elders || !Array.isArray(elders)) {
-            return res.status(400).json({ error: 'Missing or invalid "elders" array' });
-        }
-        
         const docRef = db.collection('ministering').doc('mainData');
         const doc = await docRef.get();
         
@@ -239,93 +344,17 @@ app.post('/api/sync', async (req, res) => {
         } else {
             currentData = doc.data();
         }
-        
-        const existingBros = new Set(currentData.masterBros || []);
-        const existingFams = new Set(currentData.masterFams || []);
-        
-        // 1. First, import ALL eligible ministers and assignments to our master list.
-        // This ensures unassigned brothers/families are present in our roster database!
-        if (ministeringData && ministeringData.eligibleMinistersAndAssignments) {
-            const ema = ministeringData.eligibleMinistersAndAssignments;
-            
-            if (ema.eligibleMinisters && Array.isArray(ema.eligibleMinisters)) {
-                console.log(`Processing ${ema.eligibleMinisters.length} eligible ministers from LCR...`);
-                for (const min of ema.eligibleMinisters) {
-                    const lcrName = min.name;
-                    if (!lcrName) continue;
-                    
-                    let matchedName = findMatchingBrother(lcrName, existingBros);
-                    if (!matchedName) {
-                        existingBros.add(lcrName);
-                    }
-                }
-            }
-            
-            if (ema.eligibleAssignments && Array.isArray(ema.eligibleAssignments)) {
-                console.log(`Processing ${ema.eligibleAssignments.length} eligible assignments from LCR...`);
-                for (const ass of ema.eligibleAssignments) {
-                    const lcrName = ass.name;
-                    if (!lcrName) continue;
-                    
-                    let matchedName = findMatchingFamily(lcrName, existingFams);
-                    if (!matchedName) {
-                        existingFams.add(lcrName);
-                    }
-                }
-            }
-        }
-        
-        // 2. Map companionships and match names to existing rosters
-        const newComps = {};
-        
-        for (const dist of elders) {
-            const distName = dist.districtName || "Unnamed District";
-            newComps[distName] = [];
-            
-            for (const comp of (dist.companionships || [])) {
-                const brothers = [];
-                const families = [];
-                
-                for (const min of (comp.ministers || [])) {
-                    const lcrName = min.name;
-                    if (!lcrName) continue;
-                    
-                    let matchedName = findMatchingBrother(lcrName, existingBros);
-                    if (!matchedName) {
-                        matchedName = lcrName;
-                        existingBros.add(lcrName);
-                    }
-                    brothers.push(matchedName);
-                }
-                
-                for (const ass of (comp.assignments || [])) {
-                    const lcrName = ass.name;
-                    if (!lcrName) continue;
-                    
-                    let matchedName = findMatchingFamily(lcrName, existingFams);
-                    if (!matchedName) {
-                        matchedName = lcrName;
-                        existingFams.add(lcrName);
-                    }
-                    families.push(matchedName);
-                }
-                
-                if (brothers.length > 0 || families.length > 0) {
-                    newComps[distName].push({ brothers, families });
-                }
-            }
-        }
-        
-        const finalData = {
-            comps: newComps,
-            masterBros: Array.from(existingBros).sort(),
-            masterFams: Array.from(existingFams).sort()
-        };
+
+        const { finalData, debugKeys, report } = syncMinisteringData(currentData, req.body);
         
         await docRef.set(finalData);
-        console.log(`Successfully synced from LCR! Districts: ${Object.keys(newComps).length}, Brothers: ${existingBros.size}, Families: ${existingFams.size}`);
         
-        res.json({ success: true, debugKeys });
+        console.log(`Successfully synced from LCR!`);
+        console.log(`- Districts: ${Object.keys(finalData.comps).length}`);
+        console.log(`- Brothers: ${finalData.masterBros.length} (Added: ${report.addedBros.length}, Removed: ${report.removedBros.length})`);
+        console.log(`- Families: ${finalData.masterFams.length} (Added: ${report.addedFams.length}, Removed: ${report.removedFams.length})`);
+        
+        res.json({ success: true, debugKeys, report });
     } catch (e) {
         console.error("POST /api/sync error:", e);
         res.status(500).json({ error: e.message });
@@ -342,6 +371,7 @@ if (process.env.NODE_ENV === 'test') {
         normalizeFamilyName,
         parseFamilyName,
         findMatchingBrother,
-        findMatchingFamily
+        findMatchingFamily,
+        syncMinisteringData
     };
 }

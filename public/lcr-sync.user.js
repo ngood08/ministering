@@ -95,13 +95,18 @@
                     if (response.status === 200) {
                         try {
                             const resObj = JSON.parse(response.responseText);
-                            if (resObj.debugKeys) {
+                            if (resObj.report) {
+                                const r = resObj.report;
+                                const addedStr = `Added: ${r.addedBros.length}B/${r.addedFams.length}F`;
+                                const prunedStr = `Pruned: ${r.removedBros.length}B/${r.removedFams.length}F`;
+                                statusEl.innerHTML = `Sync Successful!<br>${addedStr}<br>${prunedStr}<br><strong style="color:#f1c40f;">Refresh local tool tab!</strong>`;
+                            } else if (resObj.debugKeys) {
                                 statusEl.textContent = `Sync Successful! Keys: ${resObj.debugKeys.join(', ')}`;
                             } else {
-                                statusEl.textContent = 'Sync Successful!';
+                                statusEl.textContent = 'Sync Successful! Refresh local tool tab.';
                             }
                         } catch(e) {
-                            statusEl.textContent = 'Sync Successful!';
+                            statusEl.textContent = 'Sync Successful! Refresh local tool tab.';
                         }
                         statusEl.style.color = '#2ecc71';
                     } else if (response.status === 401) {
