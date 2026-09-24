@@ -300,7 +300,7 @@ function createCompUI(bros = [], fams = []) {
     card.innerHTML = `
         <div class="card-head">
             <span class="comp-number">Comp #${compId}</span>
-            <span style="color:red;cursor:pointer;float:right" onclick="delComp('${id}')">×</span>
+            <span class="card-del-btn" onclick="delComp('${id}')" title="Delete Companionship">×</span>
         </div>
         <div class="lbl">Brothers</div>
         <div class="box b-box" data-type="bro"></div>
@@ -426,7 +426,27 @@ function updateCounts() {
     document.getElementById('cnt-fams').innerText = document.getElementById('pool-fams').children.length;
 }
 
+function initTheme() {
+    const isDark = document.documentElement.classList.contains('dark-theme');
+    updateThemeToggleBtn(isDark);
+}
+
+function toggleTheme() {
+    const isDark = document.documentElement.classList.toggle('dark-theme');
+    localStorage.setItem('ministering_theme', isDark ? 'dark' : 'light');
+    updateThemeToggleBtn(isDark);
+}
+
+function updateThemeToggleBtn(isDark) {
+    const btn = document.getElementById('theme-toggle-btn');
+    if (btn) {
+        btn.innerHTML = isDark ? '☀️ Light Mode' : '🌙 Dark Mode';
+        btn.setAttribute('aria-label', isDark ? 'Switch to light mode' : 'Switch to dark mode');
+    }
+}
+
 window.onload = async () => {
+    initTheme();
     if (currentPin) {
         try {
             const res = await fetch('/api/verify', { headers: { 'X-PIN': currentPin } });

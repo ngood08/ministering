@@ -4,23 +4,35 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ministering Sandbox (Hosted)</title>
+    <script>
+        (function() {
+            // Apply dark theme immediately before paint to prevent flashing on TVs
+            const savedTheme = localStorage.getItem('ministering_theme');
+            if (savedTheme === 'light') {
+                document.documentElement.classList.remove('dark-theme');
+            } else {
+                document.documentElement.classList.add('dark-theme');
+            }
+        })();
+    </script>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<div id="login-overlay" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:9999;display:flex;justify-content:center;align-items:center;">
-    <div style="background:white;padding:30px;border-radius:8px;text-align:center;">
-        <h2 style="margin-top:0;">Enter PIN</h2>
-        <input type="password" id="pin-input" maxlength="4" style="font-size:32px;width:120px;text-align:center;letter-spacing:15px;padding:10px;border:2px solid #ccc;border-radius:4px;" onkeypress="if(event.key==='Enter') checkPin()">
+<div id="login-overlay" class="login-overlay">
+    <div class="login-modal">
+        <h2 class="login-title">Enter PIN</h2>
+        <input type="password" id="pin-input" class="pin-input" maxlength="4" onkeypress="if(event.key==='Enter') checkPin()">
         <br><br>
-        <button class="action-btn" onclick="checkPin()" style="width:100%;font-size:1.1rem;">Login</button>
-        <div id="login-error" style="color:#e74c3c;margin-top:15px;display:none;font-weight:bold;">Incorrect PIN</div>
+        <button class="action-btn login-btn" onclick="checkPin()">Login</button>
+        <div id="login-error" class="login-error">Incorrect PIN</div>
     </div>
 </div>
 
 <header>
     <h1>Ministering Sandbox</h1>
     <div class="header-btns">
+        <button id="theme-toggle-btn" class="action-btn theme-toggle-btn" onclick="toggleTheme()" title="Toggle Dark/Light Mode" aria-label="Toggle theme">☀️ Light Mode</button>
         <input type="file" id="import-file" style="display:none" onchange="handleFileSelect(this)">
         <button class="action-btn" onclick="window.open('/lcr-sync.user.js', '_blank')" style="background-color:#9b59b6;">Install LCR Sync Script</button>
         <button class="action-btn" onclick="document.getElementById('import-file').click()">Import JSON</button>
@@ -33,7 +45,7 @@
     <div class="sidebar">
         <div class="pool-header">
             <div class="pool-title">
-                Unassigned Brothers <span id="cnt-bros">0</span>
+                <span>Unassigned Brothers <span id="cnt-bros" class="counter-badge">0</span></span>
                 <button class="add-item-btn" onclick="manualAdd('bro')" title="Add Missing Brother">+</button>
             </div>
             <input type="text" id="search-bros" class="search-box" placeholder="Search brothers..." onkeyup="filterList('pool-bros', this.value)">
@@ -41,13 +53,12 @@
         <div id="pool-bros" class="pool-content box" data-type="bro"></div>
     </div>
     
-    <div id="board">
-        </div>
+    <div id="board"></div>
 
     <div class="sidebar right">
         <div class="pool-header">
             <div class="pool-title">
-                Unassigned Households <span id="cnt-fams">0</span>
+                <span>Unassigned Households <span id="cnt-fams" class="counter-badge">0</span></span>
                 <button class="add-item-btn" onclick="manualAdd('fam')" title="Add Missing Household">+</button>
             </div>
             <input type="text" id="search-fams" class="search-box" placeholder="Search households..." onkeyup="filterList('pool-fams', this.value)">
